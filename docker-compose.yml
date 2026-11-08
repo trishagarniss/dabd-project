@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Streaming Message Broker (Redpanda - Kafka Compatible, Low Resource)
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.11
+    container_name: fdp-redpanda
+    command:
+      - redpanda start
+      - --smp 1
+      - --memory 512M
+      - --overprovisioned
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+      - "9644:9644" # Admin API
+    volumes:
+      - redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -i healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Serving Layer & Metadata Store (PostgreSQL)
+  postgres:
+    image: postgres:15-alpine
+    container_name: fdp-postgres
+    environment:
+      POSTGRES_USER: fdp_user
+      POSTGRES_PASSWORD: fdp_password
+      POSTGRES_DB: flight_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fdp_user -d flight_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redpanda-data:
+  postgres-data:
