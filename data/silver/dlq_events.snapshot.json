@@ -1,0 +1,26 @@
+{
+  "version": "20261121T135419650969Z",
+  "description": "Quarantined invalid/late events",
+  "row_count": 2,
+  "sha256": "738280c695ca7c7debcb5f3a006bdb691f7a8c7446c32b340e2427f32bc6aa13",
+  "content_sha256": "fdf33a3b441576b204ce649b67e91c1982a382b99dd7da659a5a6fbeecb0715f",
+  "columns": [
+    "event_id",
+    "reasons",
+    "raw_payload",
+    "quarantined_at",
+    "run_id"
+  ],
+  "written_at": "2026-11-21T13:54:19.672974+00:00",
+  "keys": [
+    "event_id",
+    "reasons"
+  ],
+  "snapshots": [
+    "version=20261121T133927987431Z",
+    "version=20261121T133928309283Z",
+    "version=20261121T135358932495Z",
+    "version=20261121T135419221414Z",
+    "version=20261121T135419650969Z"
+  ]
+}

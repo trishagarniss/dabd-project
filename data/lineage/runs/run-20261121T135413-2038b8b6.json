@@ -1,0 +1,44 @@
+{
+  "run_id": "run-20261121T135413-2038b8b6",
+  "job": "stream_bronze_replay",
+  "inputs": [
+    "C:\\Users\\Acer\\AppData\\Local\\Temp\\pytest-of-Acer\\pytest-8\\test_late_event_is_quarantined0\\late_events.jsonl"
+  ],
+  "outputs": [
+    "silver.flight_states_clean",
+    "silver.dlq_events",
+    "gold.active_flights_mart",
+    "gold.airspace_density_mart"
+  ],
+  "consumers": [
+    "fastapi-serving",
+    "web-dashboard",
+    "ml-training"
+  ],
+  "row_counts": {
+    "ACCEPTED": 0,
+    "DUPLICATE": 0,
+    "INVALID": 0,
+    "LATE": 1
+  },
+  "snapshots": {
+    "silver.flight_states_clean": {
+      "version": null,
+      "row_count": 0
+    },
+    "silver.dlq_events": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.active_flights_mart": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.airspace_density_mart": {
+      "version": null,
+      "row_count": 0
+    }
+  },
+  "status": "SUCCESS",
+  "recorded_at": "2026-11-21T13:54:19.678499+00:00"
+}

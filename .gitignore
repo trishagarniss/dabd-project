@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+web-dashboard/node_modules/
+web-dashboard/dist/
+data/state/
+logs/
+.pytest_cache/
+.coverage
+backups/
+restore_test/
+data/bronze/flight_events_raw.jsonl

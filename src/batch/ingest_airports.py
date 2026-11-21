@@ -1,90 +1,128 @@
 """
-Master Data Airports Ingestion (Batch Source)
-Dataset ini menjadi sumber data BATCH (F-02) yang berisi metadata bandara:
-- icao_code, iata_code, airport_name, city, country, latitude, longitude, altitude_ft
-Data diunduh/dibuat dari dataset publik resmi (OurAirports / OpenFlights) berlisensi Public Domain.
+Batch Source 1: OurAirports global airport master (F-02, F-03).
+
+Real, public-domain data from https://davidmegginson.github.io/ourairports-data/airports.csv
+Writes an idempotent raw/bronze snapshot with batch_id, source, ingest_time and checksum.
+The fallback below only uses a previously downloaded local snapshot; it never invents rows.
 """
+from __future__ import annotations
 
-import os
+import argparse
 import hashlib
+import io
+import json
+from pathlib import Path
+
 import pandas as pd
-from datetime import datetime, timezone
+import requests
 
-# URL dataset terbuka bandara global (OurAirports - Public Domain)
-AIRPORTS_DATA_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "reference")
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "airports_reference.parquet")
+from src.common.config import (
+    BRONZE_DIR, EVIDENCE_DIR, OURAIRPORTS_URL, REFERENCE_DIR, RUN_ID, utcnow_iso,
+)
+from src.common.lineage import record_lineage
+from src.common.logging_utils import get_logger
+from src.common.metrics import count_event, measure_job
+from src.common.storage import write_snapshot
 
-def download_and_process_airports():
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    print(f"[INFO] Mengunduh data bandara terbuka dari {AIRPORTS_DATA_URL}...")
-    
+log = get_logger("batch.airports")
+RAW_PATH = BRONZE_DIR / "airports_raw"
+LOCAL_CACHE = REFERENCE_DIR / "airports_reference.csv"
+JOB_EVIDENCE = EVIDENCE_DIR / "jobs"
+COLUMNS = [
+    "ident", "iata_code", "name", "type", "latitude_deg", "longitude_deg",
+    "elevation_ft", "iso_country", "municipality",
+]
+
+
+def _batch_id(source: str, checksum: str) -> str:
+    return "BATCH_AIRPORTS_" + hashlib.sha256(f"{source}|{checksum}".encode()).hexdigest()[:16]
+
+
+def _write_status(batch_id: str, status: str, **extra: object) -> None:
+    JOB_EVIDENCE.mkdir(parents=True, exist_ok=True)
+    payload = {"batch_id": batch_id, "run_id": RUN_ID, "status": status,
+               "checked_at": utcnow_iso(), **extra}
+    (JOB_EVIDENCE / f"airports_{batch_id}.json").write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
+
+
+def _load_source(source_url: str, offline: bool) -> tuple[pd.DataFrame, str, str]:
+    if offline or not source_url:
+        if not LOCAL_CACHE.exists():
+            raise FileNotFoundError(
+                "Offline mode needs a cached OurAirports snapshot at data/reference/airports_reference.csv"
+            )
+        raw_bytes = LOCAL_CACHE.read_bytes()
+        source = f"local-cache:{LOCAL_CACHE.name}"
+    else:
+        response = requests.get(source_url, timeout=60, headers={"User-Agent": "SkyPulseAcademic/1.0"})
+        response.raise_for_status()
+        raw_bytes = response.content
+        source = source_url
+    checksum = hashlib.sha256(raw_bytes).hexdigest()
+    frame = pd.read_csv(io.BytesIO(raw_bytes), low_memory=False)
+    return frame, source, checksum
+
+
+def download_and_process_airports(source_url: str = OURAIRPORTS_URL, offline: bool = False,
+                                  mode: str = "manual") -> pd.DataFrame:
+    batch_id = "PENDING"
     try:
-        # Baca langsung menggunakan pandas
-        df_raw = pd.read_csv(AIRPORTS_DATA_URL)
-    except Exception as e:
-        print(f"[WARN] Gagal unduh online ({e}). Membuat seed dataset bandara lokal...")
-        # Fallback dataset minimal bandara internasional utama
-        data_seed = {
-            "ident": ["WIII", "WARR", "WADD", "WALL", "WSSS", "WMKK", "VTBS", "RJAA", "KJFK", "EGLL"],
-            "iata_code": ["CGK", "SUB", "DPS", "BPN", "SIN", "KUL", "BKK", "NRT", "JFK", "LHR"],
-            "name": [
-                "Soekarno-Hatta International Airport",
-                "Juanda International Airport",
-                "I Gusti Ngurah Rai International Airport",
-                "Sultan Aji Muhammad Sulaiman Sepinggan Airport",
-                "Singapore Changi Airport",
-                "Kuala Lumpur International Airport",
-                "Suvarnabhumi Airport",
-                "Narita International Airport",
-                "John F Kennedy International Airport",
-                "London Heathrow Airport"
-            ],
-            "type": ["large_airport"] * 10,
-            "latitude_deg": [-6.1256, -7.3798, -8.7482, -1.2683, 1.3502, 2.7456, 13.6811, 35.7647, 40.6398, 51.4706],
-            "longitude_deg": [106.6559, 112.7874, 115.1672, 116.8944, 103.9944, 101.7099, 100.7473, 140.3864, -73.7789, -0.4619],
-            "elevation_ft": [34, 10, 14, 11, 73, 69, 5, 141, 13, 83],
-            "iso_country": ["ID", "ID", "ID", "ID", "SG", "MY", "TH", "JP", "US", "GB"],
-            "municipality": ["Jakarta", "Surabaya", "Denpasar", "Balikpapan", "Singapore", "Kuala Lumpur", "Bangkok", "Tokyo", "New York", "London"]
-        }
-        df_raw = pd.DataFrame(data_seed)
+        frame, source, checksum = _load_source(source_url, offline)
+        batch_id = _batch_id(source, checksum)
 
-    print(f"[INFO] Total bandara mentah dari internet: {len(df_raw)} baris")
+        clean = frame[
+            frame["type"].isin(["large_airport", "medium_airport"])
+            & frame["latitude_deg"].notna() & frame["longitude_deg"].notna()
+        ].copy()
+        clean = clean[[c for c in COLUMNS if c in clean.columns]].drop_duplicates(subset=["ident"])
+        clean["batch_id"] = batch_id
+        clean["source"] = source
+        clean["source_checksum"] = checksum
+        clean["row_count"] = len(clean)
+        clean["ingest_time"] = utcnow_iso()
 
-    # Filter data: HANYA bandara komersial aktif (large & medium airport) yang memiliki kode ICAO/IATA
-    valid_types = ["large_airport", "medium_airport"]
-    df_clean = df_raw[
-        (df_raw["type"].isin(valid_types)) &
-        (df_raw["latitude_deg"].notnull()) &
-        (df_raw["longitude_deg"].notnull())
-    ].copy()
+        with measure_job("ingest_airports") as meta:
+            snapshot = write_snapshot(clean, RAW_PATH, keys=["ident"],
+                                      description="Raw OurAirports master with ingestion metadata")
+            meta["rows"] = len(clean)
+            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
+            clean.to_csv(LOCAL_CACHE, index=False)
 
-    # Pilih kolom penting yang relevan dengan domain penerbangan
-    columns_needed = [
-        "ident", "iata_code", "name", "type", 
-        "latitude_deg", "longitude_deg", "elevation_ft", 
-        "iso_country", "municipality"
-    ]
-    df_clean = df_clean[[col for col in columns_needed if col in df_clean.columns]]
-    print(f"[INFO] Setelah difilter (hanya komersial aktif): {len(df_clean)} bandara.")
-    
-    # Metadata ingestion untuk audit & lineage (F-02 & F-09)
-    ingest_time = datetime.now(timezone.utc).isoformat()
-    batch_id = f"BATCH_AIRPORTS_{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    
-    df_clean["batch_id"] = batch_id
-    df_clean["ingest_time"] = ingest_time
-    
-    # Simpan ke Parquet jika engine tersedia, fallback ke CSV
-    try:
-        df_clean.to_parquet(OUTPUT_FILE, index=False)
-        print(f"[SUCCESS] Data batch bandara tersimpan (Parquet) di: {OUTPUT_FILE}")
-    except Exception as e:
-        csv_file = OUTPUT_FILE.replace(".parquet", ".csv")
-        df_clean.to_csv(csv_file, index=False)
-        print(f"[SUCCESS] Engine parquet belum ada, disimpan (CSV) di: {csv_file}")
-    print(f"[INFO] Row count: {len(df_clean)}, Batch ID: {batch_id}")
-    return df_clean
+        record_lineage(RUN_ID, "ingest_airports", [source], ["bronze.airports_raw"],
+                       {"bronze.airports_raw": len(clean)}, consumers=["transform_batch"])
+        _write_status(batch_id, "SUCCESS", mode=mode, checksum=checksum,
+                      row_count=len(clean), snapshot_version=snapshot["version"])
+        count_event("bronze_airports", "batch")
+        log.info("airport batch ingested", extra={"batch_id": batch_id, "job": "ingest_airports",
+                                                  "rows": len(clean), "status": "SUCCESS"})
+        return clean
+    except Exception as exc:
+        _write_status(batch_id, "FAILED", error=str(exc), mode=mode, retryable=True)
+        log.error("airport batch failed", extra={"job": "ingest_airports", "status": "FAILED",
+                                                 "error": str(exc)})
+        raise
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Ingest OurAirports master data into Bronze")
+    parser.add_argument("--offline", action="store_true", help="Use cached snapshot instead of network")
+    parser.add_argument("--mode", choices=["manual", "scheduled"], default="manual")
+    parser.add_argument("--backfill-start", help="ISO date for backfill start (documentation/control field)")
+    parser.add_argument("--backfill-end", help="ISO date for backfill end (documentation/control field)")
+    parser.add_argument("--retry", type=int, default=0, help="Retry attempts on failure")
+    args = parser.parse_args()
+
+    for attempt in range(args.retry + 1):
+        try:
+            download_and_process_airports(offline=args.offline, mode=args.mode)
+            return
+        except Exception:
+            if attempt >= args.retry:
+                raise
+            log.warning("retrying airport ingest", extra={"job": "ingest_airports", "attempt": attempt + 2})
+
 
 if __name__ == "__main__":
-    download_and_process_airports()
+    main()

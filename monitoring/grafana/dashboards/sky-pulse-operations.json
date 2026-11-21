@@ -1,0 +1,42 @@
+{
+  "uid": "skypulse-ops",
+  "title": "SkyPulse Operations",
+  "tags": ["fdp", "operations"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "15s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Events processed by status",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [{"expr": "sum by (status) (rate(fdp_events_total[1m]))", "refId": "A"}]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Stream lag (seconds)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [{"expr": "fdp_stream_lag_seconds", "refId": "A"}]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Data quality pass ratio",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [{"expr": "fdp_quality_pass_ratio", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "CPU / Memory / Disk free",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"expr": "fdp_cpu_percent", "refId": "A"},
+        {"expr": "fdp_memory_mb", "refId": "B"},
+        {"expr": "fdp_disk_free_mb", "refId": "C"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "ACCEPTED": 116,
+  "DUPLICATE": 0,
+  "INVALID": 0,
+  "LATE": 8,
+  "flushed": {
+    "accepted": 116,
+    "dead_letter": 8
+  },
+  "source": "data\\bronze\\flight_events_raw.jsonl"
+}

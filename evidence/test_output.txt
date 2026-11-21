@@ -1,0 +1,30 @@
+...........................                                              [100%]
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.11.9-final-0 _______________
+
+Name                                 Stmts   Miss  Cover
+--------------------------------------------------------
+src\__init__.py                          0      0   100%
+src\batch\__init__.py                    0      0   100%
+src\batch\ingest_airports.py            81     81     0%
+src\batch\ingest_bts_ontime.py          79     79     0%
+src\batch\scheduler.py                  30     30     0%
+src\batch\transform.py                 140    140     0%
+src\common\__init__.py                   0      0   100%
+src\common\config.py                    40      0   100%
+src\common\lineage.py                   30      7    77%
+src\common\logging_utils.py             33      6    82%
+src\common\metrics.py                   81     12    85%
+src\common\quality.py                   65     16    75%
+src\common\storage.py                   95      8    92%
+src\ml\prepare_features.py              36      6    83%
+src\ml\tracking.py                      40     19    52%
+src\monitoring\__init__.py               0      0   100%
+src\monitoring\webhook_receiver.py      25     25     0%
+src\serving\api.py                     206     31    85%
+src\streaming\stream_consumer.py       171     61    64%
+--------------------------------------------------------
+TOTAL                                 1152    521    55%
+Coverage HTML written to dir evidence/coverage_html
+Coverage JSON written to file evidence/coverage.json
+27 passed in 8.70s

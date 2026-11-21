@@ -1,0 +1,2 @@
+{"job": "stream_flush", "run_id": "run-20261121T125754-47efe9c0", "started_at": "2026-11-21T12:57:54.738897+00:00", "rows": 124, "status": "SUCCESS", "duration_sec": 0.1997, "finished_at": "2026-11-21T12:57:54.938309+00:00"}
+{"job": "stream_bronze_replay", "run_id": "run-20261121T125754-47efe9c0", "started_at": "2026-11-21T12:57:54.270032+00:00", "rows": 124, "status": "SUCCESS", "duration_sec": 0.6702, "finished_at": "2026-11-21T12:57:54.940309+00:00"}

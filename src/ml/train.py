@@ -1,92 +1,119 @@
-"""
-ML Training & Versioning Script (F-11 Requirement)
-Melatih model ML untuk prediksi delay kedatangan pesawat.
-Mendukung 2 eksperimen (Baseline vs Retrained Candidate) dengan fixed test set,
-logging parameter, metrik evaluasi (MAE, RMSE, R2), dan penyimpanan artefak model.
-"""
+"""Multi-model training on the real Gold feature mart (F-11)."""
+from __future__ import annotations
 
-import os
 import json
-import argparse
 import pickle
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
 import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import Ridge
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from src.ml.prepare_features import generate_flight_ml_dataset, DATA_GOLD_DIR
+from sklearn.model_selection import train_test_split
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "models")
-METRICS_DIR = os.path.join(os.path.dirname(__file__), "experiments")
+from src.common.config import EVIDENCE_DIR, GOLD_DIR, utcnow_iso
+from src.common.logging_utils import get_logger
+from src.common.metrics import mark_model, measure_job
+from src.ml.prepare_features import FEATURES, TARGET, dataset_version, generate_flight_ml_dataset
+from src.ml.tracking import log_run
 
-def run_training(model_version="v1", model_type="baseline"):
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    os.makedirs(METRICS_DIR, exist_ok=True)
-    
-    # 1. Load Feature Store
-    feature_file = os.path.join(DATA_GOLD_DIR, "flight_ml_features.csv")
-    if not os.path.exists(feature_file):
-        df = generate_flight_ml_dataset()
-    else:
-        df = pd.read_csv(feature_file)
-        
-    features = ["distance_to_dest_km", "altitude_m", "velocity_kmh", "vertical_rate", "hour_of_day"]
-    target = "arrival_delay_min"
-    
-    X = df[features]
-    y = df[target]
-    
-    # 2. Train-Test Split (F-11: Fixed seed 42 to prevent data leakage & guarantee reproducibility)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    # 3. Model Selection: Eksperimen 1 (Baseline) vs Eksperimen 2 (Retrained / Candidate)
+log = get_logger("ml.training")
+MODEL_DIR = Path(__file__).resolve().parent / "models"
+METRICS_DIR = Path(__file__).resolve().parent / "experiments"
+REGISTRY = GOLD_DIR / "model_registry.json"
+SEED = 42
+
+
+def _build_model(model_type: str) -> tuple[Any, dict[str, Any]]:
     if model_type == "baseline":
-        model = Ridge(alpha=1.0)
-        hyperparams = {"model_name": "Ridge_Regression", "alpha": 1.0}
-    else:
-        model = RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42)
-        hyperparams = {"model_name": "RandomForestRegressor", "n_estimators": 100, "max_depth": 8}
-        
-    print(f"\n[INFO] Melatih Model {model_version} ({model_type.upper()})...")
-    model.fit(X_train, y_train)
-    
-    # 4. Evaluasi pada Test Set yang Sama Persis
-    y_pred = model.predict(X_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
-    
+        return Ridge(alpha=1.0), {"model_name": "Ridge_Regression", "alpha": 1.0}
+    if model_type == "candidate_rf":
+        return (RandomForestRegressor(n_estimators=100, max_depth=8, random_state=SEED),
+                {"model_name": "RandomForestRegressor", "n_estimators": 100, "max_depth": 8})
+    if model_type == "candidate_gbm":
+        return (GradientBoostingRegressor(n_estimators=120, learning_rate=0.08, max_depth=5,
+                                          random_state=SEED),
+                {"model_name": "GradientBoostingRegressor", "n_estimators": 120,
+                 "learning_rate": 0.08, "max_depth": 5})
+    raise ValueError(f"Unknown model_type: {model_type}")
+
+
+def run_training(model_version: str = "v1", model_type: str = "baseline") -> dict[str, Any]:
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    frame = generate_flight_ml_dataset()
+    x = frame[FEATURES]
+    y = frame[TARGET]
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=SEED)
+
+    model, hyperparams = _build_model(model_type)
+    with measure_job(f"train_{model_version}") as meta:
+        model.fit(x_train, y_train)
+        prediction = model.predict(x_test)
+        meta["rows"] = len(frame)
+
     metrics = {
+        "MAE": round(float(mean_absolute_error(y_test, prediction)), 4),
+        "RMSE": round(float(np.sqrt(mean_squared_error(y_test, prediction))), 4),
+        "R2_Score": round(float(r2_score(y_test, prediction)), 4),
+    }
+    artifact = MODEL_DIR / f"flight_delay_model_{model_version}.pkl"
+    with artifact.open("wb") as fh:
+        pickle.dump({"model": model, "features": FEATURES,
+                     "model_version": model_version, "trained_at": utcnow_iso()}, fh)
+
+    result = {
         "model_version": model_version,
         "model_type": model_type,
         "hyperparameters": hyperparams,
-        "metrics": {
-            "MAE": round(mae, 4),
-            "RMSE": round(rmse, 4),
-            "R2_Score": round(r2, 4)
-        },
-        "train_samples": len(X_train),
-        "test_samples": len(X_test)
+        "metrics": metrics,
+        "train_samples": len(x_train),
+        "test_samples": len(x_test),
+        "features": FEATURES,
+        "target": TARGET,
+        "dataset_version": dataset_version(),
+        "dataset_rows": len(frame),
+        "split_seed": SEED,
     }
-    
-    # 5. Simpan Artefak Model & Metrics JSON
-    model_artifact_path = os.path.join(MODEL_DIR, f"flight_delay_model_{model_version}.pkl")
-    with open(model_artifact_path, "wb") as f:
-        pickle.dump(model, f)
-        
-    metric_file = os.path.join(METRICS_DIR, f"experiment_{model_version}.json")
-    with open(metric_file, "w") as f:
-        json.dump(metrics, f, indent=2)
-        
-    print(f"[SUCCESS] Model {model_version} disimpan di: {model_artifact_path}")
-    print(f"[METRICS] MAE: {mae:.2f} min | RMSE: {rmse:.2f} min | R2: {r2:.4f}")
-    return metrics
+    (METRICS_DIR / f"experiment_{model_version}.json").write_text(
+        json.dumps(result, indent=2), encoding="utf-8")
+    log_run(f"run-{model_version}", model_version, model_type, hyperparams, metrics,
+            result["dataset_version"], len(frame), SEED, str(artifact))
+    log.info("model trained", extra={"job": "train", "status": "SUCCESS",
+                                     "model_version": model_version, "rows": len(frame)})
+    return result
+
+
+def promote_champion(results: list[dict[str, Any]]) -> str:
+    best = min(results, key=lambda item: item["metrics"]["RMSE"])
+    registry = {
+        "champion": best["model_version"],
+        "model_type": best["model_type"],
+        "rmse": best["metrics"]["RMSE"],
+        "features": FEATURES,
+        "dataset_version": best["dataset_version"],
+        "promoted_at": utcnow_iso(),
+    }
+    REGISTRY.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    mark_model(best["model_version"])
+    (EVIDENCE_DIR / "ml").mkdir(parents=True, exist_ok=True)
+    (EVIDENCE_DIR / "ml" / "model_registry.json").write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    return best["model_version"]
+
+
+def run_retrain_all() -> dict[str, Any]:
+    results = [run_training("v1", "baseline"), run_training("v2", "candidate_rf"),
+               run_training("v3", "candidate_gbm")]
+    champion = promote_champion(results)
+    from src.ml.tracking import write_report
+    write_report(results, champion)
+    return {"champion": champion, "experiments": results}
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--version", type=str, default="v1", help="Model version (v1, v2)")
-    parser.add_argument("--type", type=str, default="baseline", choices=["baseline", "candidate"], help="Model type")
-    args = parser.parse_args()
-    
-    run_training(args.version, args.type)
+    output = run_retrain_all()
+    print(json.dumps({"champion": output["champion"],
+                      "results": [(r["model_version"], r["metrics"]) for r in output["experiments"]]},
+                     indent=2))

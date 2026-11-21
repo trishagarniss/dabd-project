@@ -1,16 +1,29 @@
 {
   "model_version": "v2",
-  "model_type": "candidate",
+  "model_type": "candidate_rf",
   "hyperparameters": {
     "model_name": "RandomForestRegressor",
     "n_estimators": 100,
     "max_depth": 8
   },
   "metrics": {
-    "MAE": 3.2736,
-    "RMSE": 4.0449,
-    "R2_Score": 0.6894
+    "MAE": 9.2499,
+    "RMSE": 12.944,
+    "R2_Score": 0.9598
   },
-  "train_samples": 1200,
-  "test_samples": 300
+  "train_samples": 3147,
+  "test_samples": 787,
+  "features": [
+    "distance_km",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "dep_delay_min",
+    "taxi_out_min",
+    "crs_elapsed_min"
+  ],
+  "target": "arr_delay_min",
+  "dataset_version": "e6bead36ea8c8d9b",
+  "dataset_rows": 3934,
+  "split_seed": 42
 }

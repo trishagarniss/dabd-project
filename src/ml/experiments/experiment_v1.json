@@ -6,10 +6,23 @@
     "alpha": 1.0
   },
   "metrics": {
-    "MAE": 5.141,
-    "RMSE": 6.6178,
-    "R2_Score": 0.1686
+    "MAE": 8.064,
+    "RMSE": 11.0501,
+    "R2_Score": 0.9707
   },
-  "train_samples": 1200,
-  "test_samples": 300
+  "train_samples": 3147,
+  "test_samples": 787,
+  "features": [
+    "distance_km",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "dep_delay_min",
+    "taxi_out_min",
+    "crs_elapsed_min"
+  ],
+  "target": "arr_delay_min",
+  "dataset_version": "e6bead36ea8c8d9b",
+  "dataset_rows": 3934,
+  "split_seed": 42
 }

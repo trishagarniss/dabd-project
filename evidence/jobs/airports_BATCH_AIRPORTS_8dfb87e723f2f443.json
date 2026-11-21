@@ -1,0 +1,10 @@
+{
+  "batch_id": "BATCH_AIRPORTS_8dfb87e723f2f443",
+  "run_id": "run-20261121T135227-67e99130",
+  "status": "SUCCESS",
+  "checked_at": "2026-11-21T13:52:31.606726+00:00",
+  "mode": "scheduled",
+  "checksum": "eeb71bb033c440c9f542837f374ec460abdca649fb473f6c61dc9814ddf32ddf",
+  "row_count": 5282,
+  "snapshot_version": "20261121T135231224203Z"
+}

@@ -1,0 +1,27 @@
+{
+  "version": "20261121T135420159503Z",
+  "description": "ML inference predictions",
+  "row_count": 2,
+  "sha256": "97048c58bdda2e8eef6ea4c47dd22b3cbfdb5ad41c3738cf9c23392e54d278a6",
+  "content_sha256": "6daeef5e9a11c4101e3ba03a3bba1bc3ecdf4d2f71d0aef722a910945b02050d",
+  "columns": [
+    "input_record_id",
+    "model_version",
+    "predicted_at",
+    "predicted_delay_min",
+    "score",
+    "status",
+    "role"
+  ],
+  "written_at": "2026-11-21T13:54:20.185096+00:00",
+  "keys": [
+    "input_record_id"
+  ],
+  "snapshots": [
+    "version=20261121T130956434598Z",
+    "version=20261121T132545097681Z",
+    "version=20261121T132908971537Z",
+    "version=20261121T133928757320Z",
+    "version=20261121T135420159503Z"
+  ]
+}

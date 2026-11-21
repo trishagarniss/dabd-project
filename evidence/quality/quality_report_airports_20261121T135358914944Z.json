@@ -1,0 +1,37 @@
+{
+  "dataset": "airports",
+  "checked_at": "2026-11-21T13:53:58.909355+00:00",
+  "total_records": 4571,
+  "passed_records": 4570,
+  "failed_records": 1,
+  "pass_ratio": 0.9998,
+  "threshold": 0.95,
+  "failed_examples": [
+    {
+      "row_index": 2564,
+      "reasons": [
+        "range:elevation_ft"
+      ],
+      "record": {
+        "icao_code": "LLMZ",
+        "iata_code": "MTZ",
+        "name": "Bar Yehuda Airfield",
+        "type": "medium_airport",
+        "latitude": 31.328199,
+        "longitude": 35.388599,
+        "elevation_ft": -1266.0,
+        "country": "IL",
+        "municipality": "Masada",
+        "batch_id": "BATCH_AIRPORTS_8dfb87e723f2f443",
+        "source": "https://davidmegginson.github.io/ourairports-data/airports.csv",
+        "source_checksum": "eeb71bb033c440c9f542837f374ec460abdca649fb473f6c61dc9814ddf32ddf",
+        "row_count": 5282,
+        "ingest_time": "2026-11-21T13:52:31.030724+00:00",
+        "updated_at": "2026-11-21T13:52:31.030724+00:00"
+      }
+    }
+  ],
+  "cross_dataset_findings": [],
+  "warnings": [],
+  "status": "PASS"
+}

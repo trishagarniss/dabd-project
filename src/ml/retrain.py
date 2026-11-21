@@ -1,32 +1,32 @@
-"""
-Model Retraining Pipeline (F-11 & F-12)
-Script untuk menjalankan siklus eksperimen komparasi (Baseline vs Retrained Candidate)
-dan mencatat perbandingan performa kedua model.
-"""
+"""Retraining entry point (F-11): baseline vs candidate comparison and champion promotion."""
+from __future__ import annotations
 
 import json
-from src.ml.train import run_training
+from pathlib import Path
 
-def run_retrain_pipeline():
-    print("==================================================")
-    print("   FLIGHT DELAY ML RETRAINING PIPELINE (F-11)     ")
-    print("==================================================")
-    
-    # Eksperimen 1: Model Baseline (v1)
-    res_v1 = run_training(model_version="v1", model_type="baseline")
-    
-    # Eksperimen 2: Model Retrained Candidate (v2) dengan algoritma lebih kompleks
-    res_v2 = run_training(model_version="v2", model_type="candidate")
-    
-    print("\n================== KOMPARASI HASIL EKSPERIMEN ==================")
-    print(f"Model v1 (Baseline Ridge)       -> RMSE: {res_v1['metrics']['RMSE']} | MAE: {res_v1['metrics']['MAE']}")
-    print(f"Model v2 (Retrained RF)         -> RMSE: {res_v2['metrics']['RMSE']} | MAE: {res_v2['metrics']['MAE']}")
-    
-    if res_v2['metrics']['RMSE'] < res_v1['metrics']['RMSE']:
-        improvement = ((res_v1['metrics']['RMSE'] - res_v2['metrics']['RMSE']) / res_v1['metrics']['RMSE']) * 100
-        print(f"\n[PROMOSI MODEL] Model v2 menunjukkan peningkatan performa {improvement:.2f}%!")
-        print("Model v2 direkomendasikan untuk serving inference production.")
-    print("================================================================")
+from src.common.config import EVIDENCE_DIR
+from src.ml.train import run_retrain_all
+
+
+def run_retrain_pipeline() -> dict:
+    output = run_retrain_all()
+    results = {row["model_version"]: row["metrics"] for row in output["experiments"]}
+    baseline = results["v1"]["RMSE"]
+    candidate = results["v2"]["RMSE"]
+    improvement = ((baseline - candidate) / baseline * 100) if baseline else 0.0
+    summary = {
+        "baseline_rmse": baseline,
+        "candidate_rmse": candidate,
+        "improvement_pct": round(improvement, 2),
+        "champion": output["champion"],
+        "same_test_set_seed": 42,
+    }
+    target = EVIDENCE_DIR / "ml" / "comparison.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(json.dumps(summary, indent=2))
+    return summary
+
 
 if __name__ == "__main__":
     run_retrain_pipeline()

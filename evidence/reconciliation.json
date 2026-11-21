@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-11-21T13:07:17.957259+00:00",
+  "sql_equivalent": "config/serving_queries.sql Q10",
+  "ranges": [
+    {
+      "start": "2024-01-01",
+      "end": "2024-01-07",
+      "count": 1205,
+      "avg_arr_delay_min": 2.78,
+      "grain": "one row per flight_record_id"
+    },
+    {
+      "start": "2024-01-08",
+      "end": "2024-01-14",
+      "count": 787,
+      "avg_arr_delay_min": 17.38,
+      "grain": "one row per flight_record_id"
+    }
+  ]
+}

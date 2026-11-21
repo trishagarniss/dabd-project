@@ -1,0 +1,88 @@
+{
+  "owner": "SkyPulse Data Platform Team (DABD S5)",
+  "classification": "internal-academic",
+  "retention": {
+    "bronze": "90 days",
+    "silver": "180 days",
+    "gold": "365 days"
+  },
+  "refresh": {
+    "airports": "daily batch",
+    "bts_ontime": "monthly batch",
+    "flight_stream": "15s polling"
+  },
+  "datasets": {
+    "bronze.airports_raw": {
+      "owner": "Data Engineering",
+      "classification": "public",
+      "location": "data/bronze/airports_raw",
+      "schema": "ident,iata_code,name,latitude_deg,longitude_deg,elevation_ft,iso_country,municipality,batch_id,ingest_time"
+    },
+    "bronze.bts_ontime_raw": {
+      "owner": "Data Engineering",
+      "classification": "public",
+      "location": "data/bronze/bts_ontime_raw",
+      "schema": "FlightDate,Origin,Dest,CRSDepTime,ArrDelay,DepDelay,Distance"
+    },
+    "bronze.flight_events_raw": {
+      "owner": "Streaming",
+      "classification": "public",
+      "location": "data/bronze/flight_events_raw.jsonl",
+      "schema": "event_id,event_time,ingest_time,payload_version,icao24,..."
+    },
+    "silver.airports_clean": {
+      "owner": "Data Engineering",
+      "classification": "public",
+      "location": "data/silver/airports_clean",
+      "schema": "icao_code,iata_code,name,country,latitude,longitude,elevation_ft"
+    },
+    "silver.bts_ontime_clean": {
+      "owner": "Data Engineering",
+      "classification": "public",
+      "location": "data/silver/bts_ontime_clean",
+      "schema": "flight_key,flight_date,origin,dest,dep_delay_min,arr_delay_min,distance_miles"
+    },
+    "silver.flight_states_clean": {
+      "owner": "Streaming",
+      "classification": "public",
+      "location": "data/silver/flight_states_clean",
+      "schema": "event_id,icao24,event_time,ingest_time,latitude,longitude,baro_altitude"
+    },
+    "silver.dlq_events": {
+      "owner": "Data Quality",
+      "classification": "internal",
+      "location": "data/silver/dlq_events",
+      "schema": "event_id,reasons,raw_payload,quarantined_at"
+    },
+    "gold.airport_dimension": {
+      "owner": "Analytics",
+      "classification": "public",
+      "location": "data/gold/airport_dimension",
+      "schema": "icao_code,iata_code,country,latitude,longitude"
+    },
+    "gold.flight_delay_features": {
+      "owner": "ML",
+      "classification": "public",
+      "location": "data/gold/flight_delay_features",
+      "schema": "flight_record_id,distance_km,hour_of_day,day_of_week,month,dep_delay_min,taxi_out_min,crs_elapsed_min,arr_delay_min"
+    },
+    "gold.active_flights_mart": {
+      "owner": "Analytics",
+      "classification": "public",
+      "location": "data/gold/active_flights_mart",
+      "schema": "icao24,callsign,latitude,longitude,altitude_m,velocity_kmh,predicted_delay_min,last_updated"
+    },
+    "gold.airspace_density_mart": {
+      "owner": "Analytics",
+      "classification": "public",
+      "location": "data/gold/airspace_density_mart",
+      "schema": "origin_country,total_active_flights,avg_altitude_m,avg_velocity_kmh"
+    },
+    "gold.predictions": {
+      "owner": "ML",
+      "classification": "internal",
+      "location": "data/gold/predictions.jsonl",
+      "schema": "input_record_id,model_version,predicted_at,predicted_delay_min,status"
+    }
+  }
+}

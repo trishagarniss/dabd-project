@@ -1,0 +1,16 @@
+{
+  "champion": "v1",
+  "model_type": "baseline",
+  "rmse": 11.0501,
+  "features": [
+    "distance_km",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "dep_delay_min",
+    "taxi_out_min",
+    "crs_elapsed_min"
+  ],
+  "dataset_version": "e6bead36ea8c8d9b",
+  "promoted_at": "2026-11-21T12:55:01.709859+00:00"
+}

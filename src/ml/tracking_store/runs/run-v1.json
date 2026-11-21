@@ -1,0 +1,22 @@
+{
+  "run_id": "run-v1",
+  "model_version": "v1",
+  "model_type": "baseline",
+  "hyperparameters": {
+    "model_name": "Ridge_Regression",
+    "alpha": 1.0
+  },
+  "metrics": {
+    "MAE": 8.064,
+    "RMSE": 11.0501,
+    "R2_Score": 0.9707
+  },
+  "dataset_version": "e6bead36ea8c8d9b",
+  "dataset_rows": 3934,
+  "split_seed": 42,
+  "test_size": 0.2,
+  "code_version": "00922ca",
+  "artifact_path": "E:/Kuliah/S5/DABD/dabd-project/src/ml/models/flight_delay_model_v1.pkl",
+  "logged_at": "2026-11-21T12:55:00.850718+00:00",
+  "tracking_tool": "local-json-tracking-store (MLflow-equivalent)"
+}

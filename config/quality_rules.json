@@ -1,0 +1,23 @@
+{
+  "threshold_pass_ratio": 0.95,
+  "datasets": {
+    "airports": {
+      "not_null": ["icao_code", "iata_code", "latitude", "longitude"],
+      "range": {"latitude": [-90, 90], "longitude": [-180, 180], "elevation_ft": [-500, 30000]},
+      "unique": ["icao_code"],
+      "cross_dataset": []
+    },
+    "bts_ontime": {
+      "not_null": ["flight_date", "origin", "dest", "arr_delay_min", "distance_miles"],
+      "range": {"arr_delay_min": [-1440, 1440], "dep_delay_min": [-1440, 1440], "distance_miles": [0, 10000]},
+      "unique": ["flight_key"],
+      "cross_dataset": ["origin_dest_must_be_known_in_airport_dimension"]
+    },
+    "flight_event": {
+      "not_null": ["event_id", "icao24", "event_time", "latitude", "longitude"],
+      "range": {"latitude": [-90, 90], "longitude": [-180, 180], "baro_altitude": [-500, 60000], "velocity": [0, 1500]},
+      "unique": ["event_id"],
+      "cross_dataset": []
+    }
+  }
+}

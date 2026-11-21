@@ -1,0 +1,9 @@
+dataset,metric,value
+airports,dataset,airports
+airports,checked_at,2026-11-21T12:54:34.189951+00:00
+airports,total_records,4571
+airports,passed_records,4570
+airports,failed_records,1
+airports,pass_ratio,0.9998
+airports,threshold,0.95
+airports,status,PASS

@@ -1,7 +1,18 @@
-version: '3.8'
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    KAFKA_BOOTSTRAP: redpanda:9092
+    PYTHONPATH: /app
+  volumes:
+    - ./data:/app/data
+    - ./evidence:/app/evidence
+    - ./logs:/app/logs
+    - ./config:/app/config
+  restart: unless-stopped
+  networks: [backend, frontend]
 
 services:
-  # Streaming Message Broker (Redpanda - Kafka Compatible, Low Resource)
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v23.3.11
     container_name: fdp-redpanda
@@ -12,36 +23,178 @@ services:
       - --overprovisioned
       - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
       - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --set redpanda.auto_create_topics_enabled=true
     ports:
       - "19092:19092"
-      - "9644:9644" # Admin API
+      - "9644:9644"
     volumes:
       - redpanda-data:/var/lib/redpanda/data
     healthcheck:
       test: ["CMD-SHELL", "rpk cluster health | grep -i healthy || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+    deploy:
+      resources:
+        limits: {cpus: '1.0', memory: 768M}
 
-  # Serving Layer & Metadata Store (PostgreSQL)
   postgres:
     image: postgres:15-alpine
     container_name: fdp-postgres
     environment:
-      POSTGRES_USER: fdp_user
-      POSTGRES_PASSWORD: fdp_password
-      POSTGRES_DB: flight_platform
+      POSTGRES_USER: ${POSTGRES_USER:-fdp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fdp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-flight_platform}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./config/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fdp_user -d flight_platform"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fdp_user} -d ${POSTGRES_DB:-flight_platform}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
+    networks: [backend]
+    deploy:
+      resources:
+        limits: {cpus: '1.0', memory: 512M}
+
+  api:
+    <<: *app
+    container_name: fdp-api
+    command: python -m uvicorn src.serving.api:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      redpanda: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health',timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: {cpus: '1.0', memory: 1G}
+
+  producer:
+    <<: *app
+    container_name: fdp-producer
+    command: python -m src.streaming.stream_producer
+    depends_on:
+      redpanda: {condition: service_healthy}
+    deploy:
+      resources:
+        limits: {cpus: '0.5', memory: 512M}
+
+  consumer:
+    <<: *app
+    container_name: fdp-consumer
+    command: python -m src.streaming.stream_consumer
+    depends_on:
+      redpanda: {condition: service_healthy}
+    deploy:
+      resources:
+        limits: {cpus: '0.5', memory: 512M}
+
+  scheduler:
+    <<: *app
+    container_name: fdp-scheduler
+    command: python -m src.batch.scheduler
+    depends_on:
+      redpanda: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+    deploy:
+      resources:
+        limits: {cpus: '0.5', memory: 512M}
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: fdp-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    depends_on: [api, alertmanager]
+    networks: [backend, frontend]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {cpus: '0.5', memory: 512M}
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: fdp-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks: [backend, frontend]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {cpus: '0.25', memory: 256M}
+
+  webhook-receiver:
+    <<: *app
+    container_name: fdp-webhook
+    command: python -m uvicorn src.monitoring.webhook_receiver:app --host 0.0.0.0 --port 9001
+    ports:
+      - "9001:9001"
+    networks: [backend, frontend]
+
+  node-exporter:
+    profiles: ["host-metrics"] # Windows Docker Desktop cannot bind "/" rslave by default
+    image: prom/node-exporter:v1.8.1
+    container_name: fdp-node-exporter
+    command:
+      - --path.rootfs=/host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    networks: [backend]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: fdp-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+    networks: [frontend]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {cpus: '0.5', memory: 512M}
+
+networks:
+  backend:
+    driver: bridge
+    internal: false
+  frontend:
+    driver: bridge
 
 volumes:
   redpanda-data:
   postgres-data:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:

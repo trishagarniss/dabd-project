@@ -1,0 +1,42 @@
+{
+  "run_id": "run-20261121T133839-cb22c57d",
+  "job": "stream_consumer",
+  "inputs": [
+    "bronze.flight_events_raw"
+  ],
+  "outputs": [
+    "silver.flight_states_clean",
+    "silver.dlq_events",
+    "gold.active_flights_mart",
+    "gold.airspace_density_mart"
+  ],
+  "consumers": [
+    "fastapi-serving",
+    "web-dashboard",
+    "ml-training"
+  ],
+  "row_counts": {
+    "accepted": 15,
+    "dead_letter": 0
+  },
+  "snapshots": {
+    "silver.flight_states_clean": {
+      "version": null,
+      "row_count": 0
+    },
+    "silver.dlq_events": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.active_flights_mart": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.airspace_density_mart": {
+      "version": null,
+      "row_count": 0
+    }
+  },
+  "status": "SUCCESS",
+  "recorded_at": "2026-11-21T13:52:24.279170+00:00"
+}

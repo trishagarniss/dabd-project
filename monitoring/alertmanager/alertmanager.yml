@@ -1,0 +1,17 @@
+route:
+  receiver: sky-pulse-webhook
+  group_by: ["alertname", "severity"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 4h
+
+receivers:
+  - name: sky-pulse-webhook
+    webhook_configs:
+      - url: http://webhook-receiver:9001/alerts
+        send_resolved: true
+
+inhibit_rules:
+  - source_matchers: ["severity = critical"]
+    target_matchers: ["severity = warning"]
+    equal: ["alertname"]

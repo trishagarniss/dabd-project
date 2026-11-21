@@ -1,0 +1,7 @@
+{
+  "baseline_rmse": 11.0501,
+  "candidate_rmse": 12.944,
+  "improvement_pct": -17.14,
+  "champion": "v1",
+  "same_test_set_seed": 42
+}

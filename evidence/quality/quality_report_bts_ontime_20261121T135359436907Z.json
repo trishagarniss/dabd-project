@@ -1,0 +1,17 @@
+{
+  "dataset": "bts_ontime",
+  "checked_at": "2026-11-21T13:53:59.432544+00:00",
+  "total_records": 3984,
+  "passed_records": 3984,
+  "failed_records": 0,
+  "pass_ratio": 1.0,
+  "threshold": 0.95,
+  "failed_examples": [],
+  "cross_dataset_findings": [
+    "cross_dataset_unknown_airport rows=50"
+  ],
+  "warnings": [
+    "cross_dataset_unknown_airport rows=50"
+  ],
+  "status": "PASS"
+}

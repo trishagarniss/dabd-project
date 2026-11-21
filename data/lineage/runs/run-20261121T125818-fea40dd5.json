@@ -1,0 +1,58 @@
+{
+  "run_id": "run-20261121T125818-fea40dd5",
+  "job": "transform_batch",
+  "inputs": [
+    "bronze.airports_raw",
+    "bronze.bts_ontime_raw",
+    "silver.flight_states_clean"
+  ],
+  "outputs": [
+    "silver.airports_clean",
+    "silver.bts_ontime_clean",
+    "gold.airport_dimension",
+    "gold.flight_delay_features",
+    "gold.active_flights_mart",
+    "gold.airspace_density_mart"
+  ],
+  "consumers": [
+    "fastapi-serving",
+    "web-dashboard",
+    "ml-training"
+  ],
+  "row_counts": {
+    "silver.airports_clean": 4571,
+    "silver.bts_ontime_clean": 3984,
+    "gold.airport_dimension": 4571,
+    "gold.flight_delay_features": 3934,
+    "gold.active_flights_mart": 119,
+    "gold.airspace_density_mart": 16
+  },
+  "snapshots": {
+    "silver.airports_clean": {
+      "version": null,
+      "row_count": 0
+    },
+    "silver.bts_ontime_clean": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.airport_dimension": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.flight_delay_features": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.active_flights_mart": {
+      "version": null,
+      "row_count": 0
+    },
+    "gold.airspace_density_mart": {
+      "version": null,
+      "row_count": 0
+    }
+  },
+  "status": "SUCCESS",
+  "recorded_at": "2026-11-21T12:58:19.174935+00:00"
+}

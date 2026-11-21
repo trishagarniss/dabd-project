@@ -1,0 +1,35 @@
+{
+  "version": "20261121T135359088596Z",
+  "description": "Normalised airport master",
+  "row_count": 4571,
+  "sha256": "bfba174f9a2702bcbefe46f6715c9b3fc2b5aa7289c566dba28d4967b2ef546a",
+  "content_sha256": "127fe917c3a53ba98afdcd874b68494fd1ecc30a15fd799fa50f3dbedad94f9d",
+  "columns": [
+    "icao_code",
+    "iata_code",
+    "name",
+    "type",
+    "latitude",
+    "longitude",
+    "elevation_ft",
+    "country",
+    "municipality",
+    "batch_id",
+    "source",
+    "source_checksum",
+    "row_count",
+    "ingest_time",
+    "updated_at"
+  ],
+  "written_at": "2026-11-21T13:53:59.255370+00:00",
+  "keys": [
+    "icao_code"
+  ],
+  "snapshots": [
+    "version=20261121T125352062997Z",
+    "version=20261121T125434270947Z",
+    "version=20261121T125818515389Z",
+    "version=20261121T132206794663Z",
+    "version=20261121T135359088596Z"
+  ]
+}

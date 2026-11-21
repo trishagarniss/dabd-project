@@ -1,0 +1,62 @@
+[
+  {
+    "alert": "BatchJobFailed",
+    "status": "firing",
+    "delivered_at": "2026-11-21T13:05:39.404566+00:00",
+    "severity": "critical",
+    "owner": "data-engineering",
+    "threshold": "increase(fdp_job_rows_total{status=\"FAILED\"}[10m]) > 0",
+    "runbook": "docs/RUNBOOK.md#a-batch-job-failed",
+    "channel": "alertmanager-webhook"
+  },
+  {
+    "alert": "StreamLagOrFreshnessHigh",
+    "status": "firing",
+    "delivered_at": "2026-11-21T13:05:39.407881+00:00",
+    "severity": "warning",
+    "owner": "streaming",
+    "threshold": "fdp_stream_lag_seconds > 120 or fdp_ingest_freshness_seconds > 300",
+    "runbook": "docs/RUNBOOK.md#b-stream-lag-or-freshness-high",
+    "channel": "alertmanager-webhook"
+  },
+  {
+    "alert": "ServiceResourceUnhealthy",
+    "status": "firing",
+    "delivered_at": "2026-11-21T13:05:39.411879+00:00",
+    "severity": "critical",
+    "owner": "platform",
+    "threshold": "fdp_cpu_percent > 90 or fdp_memory_mb > 1500 or up{job=\"fdp-api\"} == 0",
+    "runbook": "docs/RUNBOOK.md#c-service-resource-unhealthy",
+    "channel": "alertmanager-webhook"
+  },
+  {
+    "alert": "BatchJobFailed",
+    "status": "resolved",
+    "delivered_at": "2026-11-21T13:05:39.414879+00:00",
+    "severity": "critical",
+    "owner": "data-engineering",
+    "threshold": "increase(fdp_job_rows_total{status=\"FAILED\"}[10m]) > 0",
+    "runbook": "docs/RUNBOOK.md#a-batch-job-failed",
+    "channel": "alertmanager-webhook"
+  },
+  {
+    "alert": "StreamLagOrFreshnessHigh",
+    "status": "resolved",
+    "delivered_at": "2026-11-21T13:05:39.416880+00:00",
+    "severity": "warning",
+    "owner": "streaming",
+    "threshold": "fdp_stream_lag_seconds > 120 or fdp_ingest_freshness_seconds > 300",
+    "runbook": "docs/RUNBOOK.md#b-stream-lag-or-freshness-high",
+    "channel": "alertmanager-webhook"
+  },
+  {
+    "alert": "ServiceResourceUnhealthy",
+    "status": "resolved",
+    "delivered_at": "2026-11-21T13:05:39.419461+00:00",
+    "severity": "critical",
+    "owner": "platform",
+    "threshold": "fdp_cpu_percent > 90 or fdp_memory_mb > 1500 or up{job=\"fdp-api\"} == 0",
+    "runbook": "docs/RUNBOOK.md#c-service-resource-unhealthy",
+    "channel": "alertmanager-webhook"
+  }
+]

@@ -1,0 +1,15 @@
+Task ID,Kategori,Modul / Fitur,Deskripsi Tugas,PIC,Estimasi (Hari),Status,Dependencies,Catatan / Deliverable
+T-01,Infrastruktur,F-01 Container Deployment,Setup Docker Compose Redpanda & Postgres,Alvian Damar,2,Selesai,-,docker-compose.yml aktif
+T-02,Data Ingestion,F-02 Batch Ingestion,Ingest data bandara OurAirports ke Parquet & batch_id,Talitha Sukma,2,Selesai,-,src/batch/ingest_airports.py
+T-03,Data Ingestion,F-04 Stream Producer,Tarik live OpenSky API kirim ke Redpanda topic,Alvian Damar,3,Selesai,T-01,src/streaming/stream_producer.py
+T-04,Streaming,F-05 & F-08 Dedup & Quality Gate,Validasi rentang koordinat & dedup event_id (DLQ),Stefani Ayudya,3,Selesai,T-03,src/streaming/stream_consumer.py
+T-05,Storage,F-06 Medallion Storage,Implementasi struktur folder Bronze/Silver/Gold & DDL DB,Talitha Sukma,2,Selesai,T-02,data/bronze silver gold & init_db.sql
+T-06,Machine Learning,F-11 Dataset & Feature Store,Ekstraksi fitur Haversine jarak & prepare dataset,Trisha Garnis,3,Selesai,T-05,src/ml/prepare_features.py
+T-07,Machine Learning,F-11 ML Retrain & Versioning,Training Eksperimen v1 (Ridge) vs v2 (RF) & evaluasi,Trisha Garnis,3,Selesai,T-06,src/ml/train.py & retrain.py
+T-08,Serving,F-10 Serving SQL & REST API,FastAPI endpoints active flights & airport mart,Alvian Damar,3,Selesai,T-05,src/serving/api.py
+T-09,Serving,F-12 ML Inference Integration,Endpoint POST /predict-delay dengan model v2,Trisha Garnis,2,Selesai,T-07 & T-08,src/serving/api.py
+T-10,Frontend,F-13 Analytics Dashboard,React UI cockpit radar & live inference playground,Stefani Ayudya,4,Selesai,T-08 & T-09,web-dashboard/
+T-11,Observability,F-14 & F-15 Monitoring & Alerting,Prometheus metrics exporter & 3 alert rules,Alvian Damar,2,Dalam Proses,T-01,monitoring/
+T-12,Testing,F-18 Automated Unit Tests,Pytest/Unittest coverage >= 40% untuk transform & gate,Stefani Ayudya,2,Selesai,T-04,tests/unit/test_pipeline.py
+T-13,Dokumentasi,F-09 & ADR Architecture Records,Tulis dokumen ADR-01 s/d ADR-05 & arsitektur,Talitha Sukma,3,Selesai,-,docs/adr/ & DOKUMENTASI_PROYEK.md
+T-14,Finalisasi,F-20 Video Demo & Laporan,Penyusunan video demo rekaman & laporan akhir tim,Semua Anggota,3,Belum Mulai,T-10 & T-11,Folder 04_Video_Demo

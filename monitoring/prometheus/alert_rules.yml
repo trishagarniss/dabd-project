@@ -1,0 +1,44 @@
+groups:
+  - name: sky-pulse-platform
+    rules:
+      - alert: BatchJobFailed
+        expr: increase(fdp_job_rows_total{status="FAILED"}[10m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          owner: data-engineering
+          team: batch
+        annotations:
+          summary: "Batch job failed (F-15 alert A)"
+          runbook: "docs/RUNBOOK.md#a-batch-job-failed"
+          threshold: "> 0 failed rows in 10m"
+          window: 10m
+          notification_channel: alertmanager-webhook
+
+      - alert: StreamLagOrFreshnessHigh
+        expr: fdp_stream_lag_seconds{topic="flight-raw-stream"} > 120 or fdp_ingest_freshness_seconds{dataset="silver.flight_states_clean"} > 300
+        for: 2m
+        labels:
+          severity: warning
+          owner: streaming
+          team: streaming
+        annotations:
+          summary: "Stream lag or data freshness above threshold (F-15 alert B)"
+          runbook: "docs/RUNBOOK.md#b-stream-lag-or-freshness-high"
+          threshold: "lag > 120s OR freshness > 300s"
+          window: 2m
+          notification_channel: alertmanager-webhook
+
+      - alert: ServiceResourceUnhealthy
+        expr: (fdp_cpu_percent > 90 or fdp_memory_mb > 1500 or up{job="fdp-api"} == 0)
+        for: 3m
+        labels:
+          severity: critical
+          owner: platform
+          team: operations
+        annotations:
+          summary: "Service or resource unhealthy (F-15 alert C)"
+          runbook: "docs/RUNBOOK.md#c-service-resource-unhealthy"
+          threshold: "CPU > 90% OR memory > 1500MB OR API down"
+          window: 3m
+          notification_channel: alertmanager-webhook

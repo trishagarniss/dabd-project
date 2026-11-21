@@ -1,0 +1,41 @@
+{
+  "version": "20261121T135359471102Z",
+  "description": "Normalised BTS on-time records",
+  "row_count": 3984,
+  "sha256": "5089dad05cf4659d3457ae2394365545044a66170e21967884ee63a55e27d1d1",
+  "content_sha256": "488e03b14f4d20e7d66b54b71f2cee749607cbb9a7e08597db8502ba7788e535",
+  "columns": [
+    "flight_date",
+    "carrier",
+    "origin",
+    "dest",
+    "crs_dep_time",
+    "dep_delay_min",
+    "taxi_out_min",
+    "arr_delay_min",
+    "Cancelled",
+    "Diverted",
+    "crs_elapsed_min",
+    "distance_miles",
+    "flight_key",
+    "source",
+    "archive_sha256",
+    "batch_id",
+    "ingest_time",
+    "hour_of_day",
+    "day_of_week",
+    "month",
+    "updated_at"
+  ],
+  "written_at": "2026-11-21T13:53:59.711828+00:00",
+  "keys": [
+    "flight_key"
+  ],
+  "snapshots": [
+    "version=20261121T125352210110Z",
+    "version=20261121T125434432129Z",
+    "version=20261121T125818753417Z",
+    "version=20261121T132207811246Z",
+    "version=20261121T135359471102Z"
+  ]
+}
