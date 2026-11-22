@@ -36,7 +36,18 @@ ALLOWED_LATENESS_SEC = int(os.getenv("FDP_ALLOWED_LATENESS_SEC", "300"))
 QUALITY_THRESHOLD = float(os.getenv("FDP_QUALITY_THRESHOLD", "0.95"))
 MAX_SNAPSHOT_VERSIONS = max(1, int(os.getenv("FDP_MAX_SNAPSHOT_VERSIONS", "5")))
 POLL_INTERVAL_SEC = int(os.getenv("FDP_POLL_INTERVAL_SEC", "15"))
-OPENSKY_BBOX = [-11.0, 95.0, 6.0, 141.0]
+def _parse_bbox(value: str) -> list[float] | None:
+    value = value.strip()
+    if value.lower() in {"", "global", "none", "world"}:
+        return None
+    parts = [float(part) for part in value.split(",")]
+    if len(parts) != 4:
+        raise ValueError("FDP_OPENSKY_BBOX must be 'global' or lamin,lomin,lamax,lomax")
+    return parts
+
+
+# Default: Southeast Asia. Set FDP_OPENSKY_BBOX=global for worldwide coverage.
+OPENSKY_BBOX = _parse_bbox(os.getenv("FDP_OPENSKY_BBOX", "-11.0,95.0,6.0,141.0"))
 
 API_KEYS_FILE = ROOT / ".env"
 AUDIT_LOG = LOG_DIR / "audit.jsonl"

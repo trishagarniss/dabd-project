@@ -1,3 +1,0 @@
-{"job": "train_v1", "run_id": "run-20261121T125451-0c55bbaa", "started_at": "2026-11-21T12:54:51.456819+00:00", "rows": 3934, "status": "SUCCESS", "duration_sec": 0.8691, "finished_at": "2026-11-21T12:54:52.325620+00:00"}
-{"job": "train_v2", "run_id": "run-20261121T125451-0c55bbaa", "started_at": "2026-11-21T12:54:52.370145+00:00", "rows": 3934, "status": "SUCCESS", "duration_sec": 0.3761, "finished_at": "2026-11-21T12:54:52.746168+00:00"}
-{"job": "train_v3", "run_id": "run-20261121T125451-0c55bbaa", "started_at": "2026-11-21T12:54:52.796686+00:00", "rows": 3934, "status": "SUCCESS", "duration_sec": 0.4511, "finished_at": "2026-11-21T12:54:53.247390+00:00"}

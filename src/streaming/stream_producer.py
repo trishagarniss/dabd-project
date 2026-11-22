@@ -58,7 +58,7 @@ def build_event(raw_vector: list, server_time: int) -> dict[str, Any]:
 
 
 def publish_event(event: dict[str, Any], producer: Any | None) -> str:
-    """Persist to Bronze and publish to the broker. Returns published|bronze-only."""
+    """Persist one event to Bronze and publish it. Used for Bronze replay."""
     append_jsonl(RAW_EVENTS, event)
     count_event("raw_event", "producer")
     if producer is None:
@@ -70,6 +70,30 @@ def publish_event(event: dict[str, Any], producer: Any | None) -> str:
         log.error("publish failed; event retained in Bronze", extra={
             "event_id": event.get("event_id"), "status": "FAILED", "error": str(exc)})
         return "bronze-only"
+
+
+def publish_batch(events: list[dict[str, Any]], producer: Any | None) -> tuple[int, int]:
+    """Persist a whole poll to Bronze in one write, then send it to the broker.
+
+    Global coverage yields ~5k states per poll; one file open per event made the
+    effective poll interval ~90s instead of 15s.
+    """
+    if not events:
+        return 0, 0
+    append_jsonl(RAW_EVENTS, events)
+    for _ in events:
+        count_event("raw_event", "producer")
+    if producer is None:
+        return 0, len(events)
+    published = 0
+    for event in events:
+        try:
+            producer.send(TOPIC_RAW, key=event.get("partition_key"), value=event)
+            published += 1
+        except Exception as exc:
+            log.error("publish failed; event retained in Bronze", extra={
+                "event_id": event.get("event_id"), "status": "FAILED", "error": str(exc)})
+    return published, len(events) - published
 
 
 def run_stream_producer(poll_interval_sec: int = POLL_INTERVAL_SEC, duration_sec: int | None = None,
@@ -103,10 +127,11 @@ def run_stream_producer(poll_interval_sec: int = POLL_INTERVAL_SEC, duration_sec
             count = 0
             if payload and payload.get("states"):
                 server_time = payload.get("time", int(time.time()))
-                for vector in payload["states"]:
-                    result = publish_event(build_event(vector, server_time), producer)
-                    stats["published" if result == "published" else "bronze_only"] += 1
-                    count += 1
+                events = [build_event(vector, server_time) for vector in payload["states"]]
+                published, bronze_only = publish_batch(events, producer)
+                stats["published"] += published
+                stats["bronze_only"] += bronze_only
+                count = len(events)
             if producer:
                 producer.flush()
             log.info("poll completed", extra={"job": "stream_producer", "rows": count,

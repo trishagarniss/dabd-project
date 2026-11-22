@@ -1,7 +1,0 @@
-metric,p50,p95,unit,sample_size
-batch_write_throughput_rows_per_sec,43381.0,,rows/s,30
-stream_freshness_age_seconds,571.4,813.4,s,124
-serving_latency_ms,8.28,10.13,ms,30
-cpu_percent,23.1,,%,1
-process_memory_mb,219.2,,MB,1
-disk_free_mb,395054.1,,MB,1

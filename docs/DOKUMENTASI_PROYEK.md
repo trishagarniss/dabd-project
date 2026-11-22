@@ -26,9 +26,9 @@ Berikut adalah visualisasi aliran data lengkap dari sumber sampai ke dashboard:
 |                                           1. INGESTION SOURCES                                              |
 |                                                                                                             |
 |  [ Sumber Stream (Real-Time) ]                                    [ Sumber Batch (Terjadwal) ]              |
-|   OpenSky Network Live API                                         OurAirports Master Database              |
-|   (Polled tiap 15 detik, koordinat,                                (5.282 bandara komersial global,         |
-|    kecepatan, altitude pesawat)                                     kode ICAO/IATA, elevasi)                |
+|   OpenSky Network Live API                                         OurAirports + BTS TranStats              |
+|   (Polled tiap 15 detik, koordinat,                                (5.282 bandara global,                   |
+|    kecepatan, altitude pesawat)                                    4.160 flight Jan 2024)                   |
 +-------------------------------------------------------------------------------------------------------------+
                │                                                                   │
                ▼                                                                   ▼
@@ -65,9 +65,9 @@ Berikut adalah visualisasi aliran data lengkap dari sumber sampai ke dashboard:
 +-------------------------------------------------------------------------------------------------------------+
 | 5. MACHINE LEARNING ENGINE (src/ml/) (F-11 & F-12)                                                          |
 |                                                                                                             |
-|  - Eksperimen 1 (Baseline)  : Model Ridge Regression (MAE: 5.14 menit, RMSE: 6.62)                          |
-|  - Eksperimen 2 (Candidate) : Model Random Forest (MAE: 3.27 menit, RMSE: 4.04) -> [Peningkatan 38.88%]    |
-|  - Model Versioning & MLflow: Model v2 otomatis dipromosikan sebagai Champion                               |
+|  - Eksperimen v1 (Baseline)  : Ridge Regression (MAE 8.06, RMSE 11.05) -> Champion                          |
+|  - Eksperimen v2 / v3        : Random Forest RMSE 12.94 / Gradient Boosting RMSE 12.78                      |
+|  - Model Versioning          : tracker JSONL lokal (pengganti MLflow), champion di registry                 |
 +-------------------------------------------------------------------------------------------------------------+
                                        │
                                        ▼
@@ -75,10 +75,10 @@ Berikut adalah visualisasi aliran data lengkap dari sumber sampai ke dashboard:
 | 6. SERVING API LAYER (FastAPI - src/serving/api.py) (F-10)                                                  |
 |                                                                                                             |
 |  - GET  /api/v1/health             : Healthcheck container & status model ML                                |
-|  - GET  /api/v1/flights/active     : Mengambil 50 record data mart penerbangan aktif                        |
+|  - GET  /api/v1/flights/active     : Mengambil hingga 500 record pesawat aktif (live tracks)                |
 |  - GET  /api/v1/airports/{code}    : Query metadata bandara berdasarkan IATA/ICAO                           |
 |  - POST /api/v1/ml/predict-delay   : Online inference prediksi keterlambatan (F-12)                         |
-|  - GET  /api/v1/ml/experiments     : Komparasi parameter & metrik model v1 vs v2                           |
+|  - GET  /api/v1/ml/experiments     : Komparasi parameter & metrik model v1/v2/v3                            |
 +-------------------------------------------------------------------------------------------------------------+
                                        │
                                        ▼
@@ -95,7 +95,7 @@ Berikut adalah visualisasi aliran data lengkap dari sumber sampai ke dashboard:
 ## 🔄 3. Penjelasan Alur Kerja Tahap demi Tahap
 
 ### Tahap A: Pengambilan Data (Ingestion)
-1. **Streaming Data**: Script `stream_producer.py` menghubungi OpenSky API setiap 15 detik. Mengambil pesawat yang sedang berada di langit Indonesia/ASEAN.
+1. **Streaming Data**: Script `stream_producer.py` menghubungi OpenSky API setiap 30 detik. Mengambil pesawat yang sedang berada di langit **seluruh dunia** (`FDP_OPENSKY_BBOX=global`); dapat dibatasi ke wilayah tertentu lewat bbox.
 2. Setiap data pesawat diberi:
    - `event_id`: ID unik turunan hash SHA-256 (`icao24 + timestamp`) agar tidak terjadi duplikasi pesan.
    - `event_time`: Waktu saat pesawat mentransmisikan sinyal.
@@ -114,25 +114,27 @@ Data disimpan secara terstruktur ke 3 lapisan:
 - **Gold (Curated Mart)**: Menggabungkan (*enrichment*) data Silver pesawat dengan data Batch bandara menggunakan formula matematika *Haversine* untuk menghitung jarak sisa pesawat ke bandara tujuan.
 
 ### Tahap D: Machine Learning & Retraining
-1. **Fitur yang Digunakan**: Jarak sisa penerbangan (`distance_to_dest_km`), ketinggian (`altitude_m`), kecepatan (`velocity_kmh`), dan jam sibuk operasional bandara (`hour_of_day`).
-2. **Komparasi 2 Model**:
-   - Dibuat 2 eksperimen dengan test set yang sama persis (bebas data leakage, `random_state=42`).
-   - Model v2 (Random Forest) mengungguli Model v1 (Ridge) dengan penurunan eror RMSE sebesar **38.88%**.
-   - Model v2 disimpan sebagai artefak `.pkl` untuk melayani request prediksi.
+1. **Fitur yang Digunakan**: `distance_km`, `hour_of_day`, `day_of_week`, `month`, `dep_delay_min`, `taxi_out_min`, dan `crs_elapsed_min`, seluruhnya dari dataset BTS asli (tanpa data sintetis).
+2. **Komparasi 3 Model**:
+   - Eksperimen v1 (Ridge), v2 (Random Forest), dan v3 (Gradient Boosting) memakai test set yang sama (`random_state=42`, `test_size=0.2`).
+   - Hasil terakhir: v1 RMSE 11,05; v2 RMSE 12,94; v3 RMSE 12,78. **Champion = v1 Ridge** karena RMSE terkecil.
+   - Champion disimpan sebagai artefak `.pkl` dan dicatat di `data/gold/model_registry.json`.
+3. **Catatan leakage**: `dep_delay_min` dan `taxi_out_min` baru diketahui setelah keberangkatan; untuk prediksi pra-keberangkatan keduanya perlu dikeluarkan.
 
 ### Tahap E: Serving & Dashboard
 1. Backend **FastAPI** membaca data Gold mart dan menyediakan endpoint API yang cepat dan aman.
 2. Frontend **React (Vite)** menyajikan:
-   - 4 kartu KPI operasional (*total pesawat, estimasi delay, kecepatan rata-rata, ketinggian*).
+   - 4 kartu KPI operasional (total flight records, rata-rata arrival delay, rata-rata jarak rute, live tracks).
+   - Peta **Live ADS-B Radar** dengan ikon pesawat yang berputar mengikuti heading (`true_track_deg`).
    - Tabel radar dengan fitur pencarian instan.
-   - Panel governance ML untuk melihat perbandingan akurasi model v1 vs v2.
+   - Panel governance ML untuk melihat perbandingan akurasi model v1/v2/v3.
    - Kalkulator inference interaktif untuk menguji prediksi delay secara langsung.
 
 ---
 
 ## 🚀 4. Cara Menjalankan Proyek (Demo Guide)
 
-### 1. Jalankan Retraining ML (Eksperimen v1 vs v2)
+### 1. Jalankan Retraining ML (Eksperimen v1/v2/v3)
 ```powershell
 cd E:\Kuliah\S5\DABD\dabd-project
 python -m src.ml.retrain
@@ -154,7 +156,7 @@ npm run dev
 
 ### 4. Jalankan Unit Test (Quality Gate & Pipeline Validation)
 ```powershell
-python -m unittest discover -s tests/unit
+python -m pytest --cov=src --cov-report=term
 ```
 
 ---

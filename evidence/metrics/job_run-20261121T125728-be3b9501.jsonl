@@ -1,2 +1,0 @@
-{"job": "stream_flush", "run_id": "run-20261121T125728-be3b9501", "started_at": "2026-11-21T12:57:29.096295+00:00", "rows": 0, "status": "FAILED", "error": "unhashable type: 'numpy.ndarray'", "duration_sec": 0.1525, "finished_at": "2026-11-21T12:57:29.249009+00:00"}
-{"job": "stream_bronze_replay", "run_id": "run-20261121T125728-be3b9501", "started_at": "2026-11-21T12:57:28.698996+00:00", "rows": 0, "status": "FAILED", "error": "unhashable type: 'numpy.ndarray'", "duration_sec": 0.5508, "finished_at": "2026-11-21T12:57:29.250010+00:00"}

@@ -1,9 +1,0 @@
-dataset,metric,value
-bts_ontime,dataset,bts_ontime
-bts_ontime,checked_at,2026-11-21T13:22:07.697509+00:00
-bts_ontime,total_records,3984
-bts_ontime,passed_records,3984
-bts_ontime,failed_records,0
-bts_ontime,pass_ratio,1.0
-bts_ontime,threshold,0.95
-bts_ontime,status,PASS

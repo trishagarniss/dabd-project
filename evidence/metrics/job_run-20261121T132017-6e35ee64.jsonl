@@ -1,3 +1,0 @@
-{"job": "ingest_airports", "run_id": "run-20261121T132017-6e35ee64", "started_at": "2026-11-21T13:20:21.008710+00:00", "rows": 5282, "status": "SUCCESS", "duration_sec": 0.6581, "finished_at": "2026-11-21T13:20:21.666842+00:00"}
-{"job": "ingest_bts_ontime", "run_id": "run-20261121T132017-6e35ee64", "started_at": "2026-11-21T13:22:05.920477+00:00", "rows": 4160, "status": "SUCCESS", "duration_sec": 0.3963, "finished_at": "2026-11-21T13:22:06.316808+00:00"}
-{"job": "transform_batch", "run_id": "run-20261121T132017-6e35ee64", "started_at": "2026-11-21T13:22:06.394278+00:00", "rows": 17210, "status": "SUCCESS", "duration_sec": 3.1043, "finished_at": "2026-11-21T13:22:09.498543+00:00"}

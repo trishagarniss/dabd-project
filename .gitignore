@@ -10,3 +10,7 @@ logs/
 backups/
 restore_test/
 data/bronze/flight_events_raw.jsonl
+data/
+evidence/
+*.log
+src/ml/tracking_store/runs/

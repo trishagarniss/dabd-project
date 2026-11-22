@@ -30,25 +30,54 @@ RAW_EVENTS = BRONZE_DIR / "flight_events_raw.jsonl"
 
 _buffer_valid: list[dict[str, Any]] = []
 _buffer_invalid: list[dict[str, Any]] = []
-FLUSH_EVERY = 20
+# Global coverage pushes ~5k events per poll; batching snapshots avoids a Parquet
+# rewrite every 20 events while keeping replay/dedup semantics unchanged.
+FLUSH_EVERY = 5000
+_DEDUP_CONN: sqlite3.Connection | None = None
+_SEEN: set[str] | None = None
+_NEW_IDS: list[str] = []
 
 
 def _dedup_db() -> sqlite3.Connection:
-    DEDUP_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DEDUP_DB)
-    conn.execute("CREATE TABLE IF NOT EXISTS seen_events (event_id TEXT PRIMARY KEY, processed_at TEXT)")
+    global _DEDUP_CONN
+    if _DEDUP_CONN is None:
+        DEDUP_DB.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(DEDUP_DB, check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("CREATE TABLE IF NOT EXISTS seen_events (event_id TEXT PRIMARY KEY, processed_at TEXT)")
+        conn.commit()
+        _DEDUP_CONN = conn
+    return _DEDUP_CONN
+
+
+def _seen_ids() -> set[str]:
+    global _SEEN
+    if _SEEN is None:
+        _SEEN = {row[0] for row in _dedup_db().execute("SELECT event_id FROM seen_events")}
+    return _SEEN
+
+
+def _persist_dedup() -> None:
+    """Flush new ids in one transaction, before Kafka offsets are committed."""
+    if not _NEW_IDS:
+        return
+    conn = _dedup_db()
+    conn.executemany(
+        "INSERT OR IGNORE INTO seen_events (event_id, processed_at) VALUES (?, ?)",
+        [(event_id, utcnow_iso()) for event_id in _NEW_IDS],
+    )
     conn.commit()
-    return conn
+    _NEW_IDS.clear()
 
 
 def is_duplicate(event_id: str) -> bool:
     """Durable dedup: survives consumer restarts (F-05)."""
-    with _dedup_db() as conn:
-        existing = conn.execute("SELECT 1 FROM seen_events WHERE event_id=?", (event_id,)).fetchone()
-        if existing:
-            return True
-        conn.execute("INSERT INTO seen_events (event_id, processed_at) VALUES (?, ?)",
-                     (event_id, utcnow_iso()))
+    seen = _seen_ids()
+    if event_id in seen:
+        return True
+    seen.add(event_id)
+    _NEW_IDS.append(event_id)
     return False
 
 
@@ -107,6 +136,7 @@ def process_event(event: dict[str, Any]) -> str:
 def flush() -> dict[str, int]:
     """Persist buffered events into Silver and recompute Gold marts."""
     global _buffer_valid, _buffer_invalid
+    _persist_dedup()
     if not _buffer_valid and not _buffer_invalid:
         return {"accepted": 0, "dead_letter": 0}
 
@@ -212,6 +242,7 @@ def run_consumer(duration_sec: int | None = None, max_messages: int | None = Non
         group_id=CONSUMER_GROUP,
         value_deserializer=lambda value: json.loads(value.decode("utf-8")),
         consumer_timeout_ms=1000 if duration_sec else 10000,
+        max_poll_interval_ms=600000,
     )
     stats = {"ACCEPTED": 0, "DUPLICATE": 0, "INVALID": 0, "LATE": 0}
     started = time.time()

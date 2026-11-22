@@ -12,12 +12,18 @@ from src.common.config import BRONZE_DIR, CONFIG_DIR, EVIDENCE_DIR, QUALITY_THRE
 
 RULES_FILE = CONFIG_DIR / "quality_rules.json"
 REPORT_DIR = EVIDENCE_DIR / "quality"
+_RULES_CACHE: dict[str, Any] | None = None
 
 
-def load_rules() -> dict[str, Any]:
-    if RULES_FILE.exists():
-        return json.loads(RULES_FILE.read_text(encoding="utf-8"))
-    return {"threshold_pass_ratio": QUALITY_THRESHOLD, "datasets": {}}
+def load_rules(refresh: bool = False) -> dict[str, Any]:
+    """Cache the small rules file; the stream gate validates thousands of events."""
+    global _RULES_CACHE
+    if _RULES_CACHE is None or refresh:
+        if RULES_FILE.exists():
+            _RULES_CACHE = json.loads(RULES_FILE.read_text(encoding="utf-8"))
+        else:
+            _RULES_CACHE = {"threshold_pass_ratio": QUALITY_THRESHOLD, "datasets": {}}
+    return _RULES_CACHE
 
 
 def validate_quality_gate(event: dict[str, Any]) -> tuple[bool, list[str]]:

@@ -1,6 +1,6 @@
 # Runbook Operasi SkyPulse (F-17)
 
-## Persediaan
+## Persiapan
 ```bash
 cp .env.example .env          # isi kunci sendiri; .env tidak di-commit
 docker compose up -d --build
@@ -13,42 +13,52 @@ python -m pytest --cov=src --cov-report=term
   severity `critical`, owner `data-engineering`.
 - **Diagnosis:** `logs/structured.jsonl` (cari `"status":"FAILED"`, `job`, `run_id`),
   `evidence/jobs/airports_<batch_id>.json`, `evidence/metrics/job_*.jsonl`.
-- **Tindakan:** jalankan semula kerja berkenaan dengan `--retry 2`; semak sumber
-  (OurAirports/BTS) dan checksum. Rerun adalah idempoten kerana `batch_id` dan `keys`.
-- **Clear:** metrik FAILED berhenti, alert status `resolved`, direkod oleh webhook.
+- **Tindakan:** jalankan ulang job terkait dengan `--retry 2`; periksa sumber
+  (OurAirports/BTS) dan checksum. Rerun bersifat idempoten karena `batch_id` dan `keys`.
+- **Clear:** metrik FAILED berhenti, status alert `resolved`, dicatat oleh webhook.
 
 ## B. StreamLagOrFreshnessHigh
 - **Trigger:** `fdp_stream_lag_seconds > 120` ATAU freshness `> 300s` selama 2m,
   severity `warning`, owner `streaming`.
 - **Diagnosis:** `evidence/metrics/job_*.jsonl`, `logs/structured.jsonl`,
-  `GET /api/v1/flights/active` → medan `freshness`.
-- **Tindakan:** semak `fdp-producer` (poll 15s), `rpk group describe`, dan dedup SQLite
+  `GET /api/v1/flights/active` → field `freshness`.
+- **Tindakan:** periksa `fdp-producer` (poll 15s), `rpk group describe`, dan dedup SQLite
   (`data/state/dedup.sqlite3`). Jika broker hilang, jalankan
   `python -m src.streaming.stream_consumer --replay-bronze data/bronze/flight_events_raw.jsonl`.
-- **Clear:** lag/freshness kembali di bawah threshold; resolved direkod.
+- **Clear:** lag/freshness kembali di bawah threshold; resolved dicatat.
 
 ## C. ServiceResourceUnhealthy
 - **Trigger:** CPU > 90% ATAU memory > 1500 MB ATAU `up{job="fdp-api"} == 0` selama 3m,
   severity `critical`, owner `platform`.
 - **Diagnosis:** Grafana "SkyPulse Operations", `GET /api/v1/metrics`, Docker stats.
-- **Tindakan:** `docker compose restart api` (atau komponen lain), semak healthcheck,
-  had resource `deploy.resources.limits` dalam `docker-compose.yml`.
-- **Clear:** metrik kembali normal; resolved direkod.
+- **Tindakan:** `docker compose restart api` (atau komponen lain), periksa healthcheck,
+  batas resource `deploy.resources.limits` di `docker-compose.yml`.
+- **Clear:** metrik kembali normal; resolved dicatat.
 
 ## Backup / Restore / Restart
 ```bash
 python -m scripts.backup
 python -m scripts.restore --manifest backups/<stamp>/manifest.json --dry-run
 python -m scripts.restore --manifest backups/<stamp>/manifest.json --target restore_test
-docker compose restart api                     # ujian restart satu komponen
+docker compose restart api                     # uji restart satu komponen
 ```
 Manifest dan checksum: `evidence/backup_manifest_latest.json`,
 `evidence/restore_report.json`, `evidence/restore_dry_run.json`.
 
 **Retensi:** `python -m scripts.backup` menyimpan hanya backup terbaru (`--keep 1`).
-Guna `--keep 3` jika mahu 3 versi, atau `--keep 0` untuk tidak membuang apa-apa.
-Snapshot Parquet juga dihadkan kepada 5 versi per dataset (`FDP_MAX_SNAPSHOT_VERSIONS`),
-supaya aliran 15s tidak membengkakkan `data/silver` dan `data/gold`.
+Gunakan `--keep 3` bila ingin 3 versi, atau `--keep 0` agar tidak menghapus apa pun.
+Snapshot Parquet juga dibatasi 5 versi per dataset (`FDP_MAX_SNAPSHOT_VERSIONS`),
+supaya aliran 15 detik tidak membengkakkan `data/silver` dan `data/gold`.
+
+## Cakupan OpenSky
+Default producer mem-poll **seluruh dunia** (`FDP_OPENSKY_BBOX=global`). Untuk membatasi
+wilayah, set `FDP_OPENSKY_BBOX=lamin,lomin,lamax,lomax` di `.env` lalu
+`docker compose up -d producer`.
+Dashboard meminta semua pesawat aktif (batas API 20.000; 5.651 pada uji global);
+jumlah sebenarnya mengikuti trafik OpenSky. Catatan: cakupan global menulis sekitar
+5.000 event ke Bronze tiap poll 15 detik, jadi pantau ukuran
+`data/bronze/flight_events_raw.jsonl`. Producer global memakai interval 30 detik
+ agar laju ~5.000 event/poll masih bisa dikejar consumer; dashboard tetap refresh 15 detik.
 
 ## Replay / Backfill
 ```bash

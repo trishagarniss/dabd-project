@@ -139,7 +139,7 @@ def health_check() -> dict[str, Any]:
 
 
 @app.get("/api/v1/flights/active", tags=["Serving Marts"])
-def get_active_flights(limit: int = Query(20, ge=1, le=500),
+def get_active_flights(limit: int = Query(20, ge=1, le=20000),
                        role: str = Depends(require_role("viewer"))) -> dict[str, Any]:
     frame = read_latest(GOLD_DIR / "active_flights_mart")
     return {"grain": "one row per icao24", "freshness": _freshness(frame),
