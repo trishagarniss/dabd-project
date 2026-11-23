@@ -16,7 +16,7 @@ from src.common.config import (
 )
 from src.common.lineage import record_lineage
 from src.common.logging_utils import get_logger
-from src.common.metrics import count_event, measure_job, set_freshness, set_lag
+from src.common.metrics import count_event, measure_job, set_freshness, set_lag, start_metrics_server
 from src.common.quality import validate_quality_gate
 from src.common.storage import append_jsonl, read_jsonl, write_snapshot
 
@@ -145,7 +145,11 @@ def flush() -> dict[str, int]:
     with measure_job("stream_flush") as meta:
         if accepted:
             frame = pd.DataFrame(accepted)
-            write_snapshot(frame, SILVER_FLIGHTS, keys=["event_id"],
+            # Dedup sudah dijamin oleh seen_events (SQLite) sebelum flush, jadi
+            # Silver cukup menyimpan batch tervalidasi terakhir. Upsert seluruh
+            # riwayat di sini menjadi lambat saat cakupan global (~5k event/poll).
+            # Riwayat lengkap tetap ada di Bronze untuk replay.
+            write_snapshot(frame, SILVER_FLIGHTS,
                            description="Validated flight telemetry (Silver)")
             latest = frame.sort_values("event_time").drop_duplicates("icao24", keep="last")
             active = pd.DataFrame({
@@ -270,6 +274,7 @@ def run_consumer(duration_sec: int | None = None, max_messages: int | None = Non
                         consumer.commit()
                         return stats
             if not batch:
+                set_lag(0.0, TOPIC_RAW)
                 flush()
                 consumer.commit()
                 if max_messages:
@@ -283,6 +288,7 @@ def run_consumer(duration_sec: int | None = None, max_messages: int | None = Non
 
 
 def main() -> None:
+    start_metrics_server(9001)
     import argparse
     parser = argparse.ArgumentParser(description="Redpanda consumer -> Silver/Gold with DLQ")
     parser.add_argument("--duration", type=int, default=None)

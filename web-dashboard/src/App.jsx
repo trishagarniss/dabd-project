@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity, ArrowRight, ArrowUp, BarChart3, Clock, Cpu, Database, Gauge, Globe,
   Layers, MapPin, Plane, Radar, RefreshCw, Route, Search, ShieldCheck, Sparkles,
   Timer, Wind,
 } from 'lucide-react'
-import { MapContainer, Marker, Popup, TileLayer, Tooltip } from 'react-leaflet'
-import { divIcon } from 'leaflet'
+import L from 'leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 
 const API_BASE = 'http://localhost:8000/api/v1'
 const headers = { 'x-api-key': import.meta.env.VITE_FDP_API_KEY || 'demo-viewer-key' }
@@ -16,16 +16,122 @@ const num = (value, digits = 0) => {
   return n.toLocaleString('id-ID', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
-function planeIcon(trackDeg) {
-  const heading = Number.isFinite(Number(trackDeg)) ? Number(trackDeg) : 0
-  return divIcon({
-    className: 'fdp-plane-marker',
-    html: `<div class="plane-icon" style="transform:rotate(${heading}deg)">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5L21 16z"/></svg>
-    </div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 13],
-  })
+// Canvas renderer: ribuan pesawat digambar sekali per frame, bukan sebagai
+// marker DOM. Tetap berputar sesuai true_track_deg dan punya tooltip saat hover.
+const FleetLayer = L.Layer.extend({
+  onAdd(map) {
+    this._map = map
+    this._canvas = L.DomUtil.create('canvas', 'fleet-canvas')
+    Object.assign(this._canvas.style, {
+      position: 'absolute', top: '0', left: '0', pointerEvents: 'auto', zIndex: 450,
+    })
+    map.getPanes().overlayPane.appendChild(this._canvas)
+
+    this._tooltip = L.DomUtil.create('div', 'fleet-tooltip')
+    this._tooltip.style.display = 'none'
+    map.getContainer().appendChild(this._tooltip)
+
+    this._onMove = (event) => {
+      const hit = (this._points || []).find(
+        (point) => Math.hypot(point.x - event.offsetX, point.y - event.offsetY) < 11,
+      )
+      if (!hit) {
+        this._tooltip.style.display = 'none'
+        return
+      }
+      const f = hit.flight
+      this._tooltip.innerHTML = `<strong>${f.callsign?.trim() || f.icao24}</strong><br />`
+        + `${f.origin_country || 'asal tidak diketahui'}<br />`
+        + `Ketinggian ${num(f.altitude_m)} m · ${num(f.velocity_kmh)} km/jam<br />`
+        + `Arah ${num(f.true_track_deg)}°`
+      this._tooltip.style.left = `${event.offsetX + 14}px`
+      this._tooltip.style.top = `${event.offsetY + 14}px`
+      this._tooltip.style.display = 'block'
+    }
+    L.DomEvent.on(this._canvas, 'mousemove', this._onMove)
+
+    map.on('move resize zoom viewreset', this.redraw, this)
+    this.redraw()
+  },
+
+  onRemove(map) {
+    map.off('move resize zoom viewreset', this.redraw, this)
+    if (this._canvas) L.DomEvent.off(this._canvas, 'mousemove', this._onMove)
+    this._tooltip?.remove()
+    this._canvas?.remove()
+  },
+
+  setFlights(flights) {
+    this._flights = flights
+    this.redraw()
+  },
+
+  redraw() {
+    const map = this._map
+    const canvas = this._canvas
+    if (!map || !canvas) return
+    const size = map.getSize()
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    canvas.width = Math.round(size.x * dpr)
+    canvas.height = Math.round(size.y * dpr)
+    canvas.style.width = `${size.x}px`
+    canvas.style.height = `${size.y}px`
+    L.DomUtil.setPosition(canvas, map.containerPointToLayerPoint([0, 0]))
+
+    const ctx = canvas.getContext('2d')
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, size.x, size.y)
+    this._points = []
+    for (const f of this._flights || []) {
+      const lat = Number(f.latitude)
+      const lng = Number(f.longitude)
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+      const point = map.latLngToContainerPoint([lat, lng])
+      if (point.x < -16 || point.y < -16 || point.x > size.x + 16 || point.y > size.y + 16) continue
+      this._points.push({ x: point.x, y: point.y, flight: f })
+
+      const heading = Number(f.true_track_deg)
+      ctx.save()
+      ctx.translate(point.x, point.y)
+      ctx.rotate(((Number.isFinite(heading) ? heading : 0) - 90) * Math.PI / 180)
+      ctx.beginPath()
+      ctx.moveTo(9, 0)
+      ctx.lineTo(-6, 5.5)
+      ctx.lineTo(-3, 0)
+      ctx.lineTo(-6, -5.5)
+      ctx.closePath()
+      ctx.fillStyle = '#f5b942'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(8, 14, 22, 0.85)'
+      ctx.lineWidth = 1
+      ctx.stroke()
+      ctx.restore()
+    }
+    this._tooltip.style.display = 'none'
+  },
+})
+
+function AircraftLayer({ flights }) {
+  const map = useMap()
+  const layerRef = useRef(null)
+
+  useEffect(() => {
+    const layer = new FleetLayer()
+    layer.setFlights(flights)
+    layer.addTo(map)
+    layerRef.current = layer
+    return () => {
+      layer.remove()
+      layerRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map])
+
+  useEffect(() => {
+    layerRef.current?.setFlights(flights)
+  }, [flights])
+
+  return null
 }
 
 function LiveDot() {
@@ -79,21 +185,7 @@ function LiveMap({ flights, freshness }) {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {visible.map((f) => (
-            <Marker
-              key={`${f.icao24}-${f.last_updated || ''}`}
-              position={[Number(f.latitude), Number(f.longitude)]}
-              icon={planeIcon(f.true_track_deg)}
-            >
-              <Tooltip direction="top" offset={[0, -9]}>{f.callsign?.trim() || f.icao24}</Tooltip>
-              <Popup>
-                <strong>{f.callsign?.trim() || f.icao24}</strong><br />
-                {f.origin_country || 'asal tidak diketahui'}<br />
-                Ketinggian {num(f.altitude_m)} m · {num(f.velocity_kmh)} km/jam<br />
-                Arah {num(f.true_track_deg)}°
-              </Popup>
-            </Marker>
-          ))}
+          <AircraftLayer flights={visible} />
         </MapContainer>
 
         {!flights.length && (

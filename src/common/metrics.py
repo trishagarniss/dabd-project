@@ -115,6 +115,20 @@ def prometheus_text() -> bytes:
     return generate_latest()
 
 
+def start_metrics_server(port: int = 9001) -> None:
+    """Expose this process's registry so Prometheus can scrape worker metrics."""
+    if generate_latest is None:  # pragma: no cover
+        log.warning("prometheus_client unavailable; metrics server not started")
+        return
+    try:
+        from prometheus_client import start_http_server
+
+        start_http_server(port, addr="0.0.0.0")
+        log.info("metrics server started", extra={"port": port})
+    except Exception as exc:  # pragma: no cover - keep the worker running
+        log.warning("metrics server failed", extra={"port": port, "error": str(exc)})
+
+
 def write_snapshot(kind: str, payload: dict) -> Path:
     """Persist a metric snapshot as evidence even when Prometheus is not deployed."""
     SNAPSHOTS.mkdir(parents=True, exist_ok=True)

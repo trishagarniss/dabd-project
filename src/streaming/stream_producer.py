@@ -16,7 +16,7 @@ from src.common.config import (
 )
 from src.common.lineage import record_lineage
 from src.common.logging_utils import get_logger
-from src.common.metrics import count_event, measure_job
+from src.common.metrics import count_event, measure_job, start_metrics_server
 from src.common.storage import append_jsonl, read_jsonl
 from src.ingestion.opensky_collector import fetch_opensky_states, parse_state_vector
 
@@ -149,6 +149,7 @@ def run_stream_producer(poll_interval_sec: int = POLL_INTERVAL_SEC, duration_sec
 
 
 def main() -> None:
+    start_metrics_server(9001)
     parser = argparse.ArgumentParser(description="OpenSky -> Redpanda producer")
     parser.add_argument("--poll-interval", type=int, default=POLL_INTERVAL_SEC)
     parser.add_argument("--duration", type=int, default=None, help="Stop after N seconds (one-shot when set)")

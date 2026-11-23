@@ -9,7 +9,7 @@ from src.batch.ingest_bts_ontime import ingest_bts_ontime
 from src.batch.transform import run_transform
 from src.common.config import EVIDENCE_DIR, utcnow_iso
 from src.common.logging_utils import get_logger
-from src.common.metrics import write_snapshot
+from src.common.metrics import start_metrics_server, write_snapshot
 
 log = get_logger("batch.scheduler")
 INTERVAL_SEC = int(os.getenv("FDP_BATCH_INTERVAL_SEC", "86400"))
@@ -19,7 +19,12 @@ SAMPLE_SIZE = int(os.getenv("FDP_BTS_SAMPLE_SIZE", "5000"))
 def run_once() -> dict:
     started = utcnow_iso()
     download_and_process_airports(mode="scheduled")
-    ingest_bts_ontime(sample_size=SAMPLE_SIZE, mode="scheduled")
+    try:
+        ingest_bts_ontime(sample_size=SAMPLE_SIZE, mode="scheduled")
+    except Exception as exc:
+        # Keep the batch usable when TranStats is unreachable: reuse the cached raw sample.
+        log.warning("BTS download failed; using cached sample", extra={"status": "WARN", "error": str(exc)})
+        ingest_bts_ontime(sample_size=SAMPLE_SIZE, offline=True, mode="scheduled-cached")
     result = run_transform(retry=2)
     payload = {"started_at": started, "finished_at": utcnow_iso(), "result": result}
     write_snapshot("scheduler", payload)
@@ -27,6 +32,7 @@ def run_once() -> dict:
 
 
 def main() -> None:
+    start_metrics_server(9001)
     log.info("batch scheduler started", extra={"job": "scheduler", "interval_sec": INTERVAL_SEC})
     while True:
         try:

@@ -87,12 +87,14 @@ def write_snapshot(df: pd.DataFrame, dataset_path: Path, keys: list[str] | None 
     version_dir = dataset_path / f"version={version}"
     version_dir.mkdir(parents=True, exist_ok=True)
     part = version_dir / "part-00000.parquet"
-    df.to_parquet(part, index=False)
 
+    # Serialize once, then copy for the immutable version: writing Parquet twice
+    # doubled the cost of every global-coverage stream flush.
     flat = dataset_path.with_suffix(".parquet")
     tmp = dataset_path.with_suffix(".parquet.tmp")
     df.to_parquet(tmp, index=False)
     shutil.move(str(tmp), str(flat))
+    shutil.copyfile(flat, part)
 
     # Keep a small rolling window of versions. Streaming writes a snapshot every
     # flush, so unbounded version directories would dominate disk and backups.

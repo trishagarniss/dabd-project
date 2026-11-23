@@ -3,11 +3,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from src.common.config import EVIDENCE_DIR, utcnow_iso
 from src.common.logging_utils import get_logger
+from src.common.metrics import prometheus_text
 from src.common.storage import append_jsonl, read_jsonl
 
 log = get_logger("monitoring.webhook")
@@ -18,6 +19,11 @@ HISTORY = EVIDENCE_DIR / "alerts" / "alert_history.jsonl"
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "HEALTHY"}
+
+
+@app.get("/metrics")
+def metrics() -> Response:
+    return Response(content=prometheus_text(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 @app.post("/alerts")

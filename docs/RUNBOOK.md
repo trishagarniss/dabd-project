@@ -54,7 +54,7 @@ supaya aliran 15 detik tidak membengkakkan `data/silver` dan `data/gold`.
 Default producer mem-poll **seluruh dunia** (`FDP_OPENSKY_BBOX=global`). Untuk membatasi
 wilayah, set `FDP_OPENSKY_BBOX=lamin,lomin,lamax,lomax` di `.env` lalu
 `docker compose up -d producer`.
-Dashboard meminta semua pesawat aktif (batas API 20.000; 5.651 pada uji global);
+Dashboard meminta semua pesawat aktif (batas API 20.000; 9.025 pada uji global terakhir);
 jumlah sebenarnya mengikuti trafik OpenSky. Catatan: cakupan global menulis sekitar
 5.000 event ke Bronze tiap poll 15 detik, jadi pantau ukuran
 `data/bronze/flight_events_raw.jsonl`. Producer global memakai interval 30 detik
